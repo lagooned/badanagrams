@@ -1,7 +1,11 @@
 
 #+title: badanagrams
 
-anagrams in clj
+- anagrams in clj
+  - uses subset partitions
+
+- todo
+  - [ ] refactor into src/core
 
 #+begin_src clojure
 (defn rotate [s]
