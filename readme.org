@@ -1,0 +1,73 @@
+
+#+title: badanagrams
+
+anagrams in clj
+
+#+begin_src clojure
+(defn rotate [s]
+  (clojure.string/join (concat (rest s) (str (first s)))))
+
+(defn rotatations [s]
+  (take (count s) (iterate rotate s)))
+
+(defn cart [& lists]
+  (let [syms (for [_ lists] (gensym))]
+    (eval `(for [~@(mapcat #(list %1 `'~%2) syms lists)]
+             (list ~@syms)))))
+
+(defn ana-hash [data s]
+  (->> s (frequencies) (hash) (get data)))
+
+(defn gen-partitions [s]
+  (as-> s $
+        (concat (rotatations $) (rotatations (reverse $)))
+        (mapcat (fn [l] (for [x (range 1 (+ 1 (count l)))] (partition-all x l))) $)))
+
+(defn find-anagram [data s]
+  (->> (clojure.string/replace s " " "")
+       (gen-partitions)
+       (pmap (fn [l] (map (partial ana-hash data) l)))
+       (pmap (fn [l] (apply cart l)))
+       (filter (complement empty?))
+       (mapcat identity)
+       (pmap reverse)
+       (pmap (partial clojure.string/join " "))
+       (distinct)))
+
+(def ana-data
+  (as-> "https://raw.githubusercontent.com/ehamiter/anagram/master/wordlist.txt" $
+    (slurp $)
+    (clojure.string/split $ #"\r?\n")
+    (conj $ "i")
+    (pmap #(cons (hash (frequencies %)) [%]) $)
+    (reduce
+      #(assoc %1
+         (first %2)
+         (conj (get %1 (first %2)) (second %2))) {} $)))
+
+(def find-anagram
+  (partial find-anagram ana-data))
+
+(find-anagram "psele")
+(find-anagram "yda srmade")
+(find-anagram "estrngi")
+(find-anagram "eht rdow nferid")
+(find-anagram "william shakespeare")
+(find-anagram "i want pie")
+#+end_src
+
+#+RESULTS:
+| #'badanagrams.core/rotate                                              |
+| #'badanagrams.core/rotatations                                         |
+| #'badanagrams.core/cart                                                |
+| #'badanagrams.core/ana-hash                                            |
+| #'badanagrams.core/gen-partitions                                      |
+| #'badanagrams.core/find-anagram                                        |
+| #'badanagrams.core/ana-data                                            |
+| #'badanagrams.core/find-anagram                                        |
+| ("el pes" "speel" "sleep" "peles" "peels" "pe sel" "pe els")           |
+| ("mead yards" "made yards" "dame yards" "mead drays" "made drays" "... |
+| ("gin rets" "gin rest" "gin erst" "stinger" "resting" "set ring" "s... |
+| ("refind worthed" "redfin worthed" "friend worthed" "finder worthed... |
+| ("re spae hake sima will" "er spae hake sima will" "re peas hake si... |
+| ("pie witan" "pie twain" "aw tiepin" "aw pinite")                      |
