@@ -11,7 +11,7 @@
 (defn rotate [s]
   (clojure.string/join (concat (rest s) (str (first s)))))
 
-(defn rotatations [s]
+(defn rotations [s]
   (take (count s) (iterate rotate s)))
 
 (defn cart [& lists]
@@ -22,32 +22,54 @@
 (defn ana-hash [data s]
   (->> s (frequencies) (hash) (get data)))
 
-(defn gen-partitions [s]
-  (as-> s $
-        (concat (rotatations $) (rotatations (reverse $)))
-        (mapcat (fn [l] (for [x (range 1 (+ 1 (count l)))] (partition-all x l))) $)))
+(defn interleave-all [a b]
+  (if (= (count a) (count b))
+    (interleave a b)
+  (cons (first a) (interleave b (rest a)))))
+
+(defn self-interleave [s]
+  (let [q (quot (count s) 2)]
+    (interleave-all (nthrest s q) (take q s))))
+
+(defn rotate-self-interleave-strategy [s]
+  (concat (rotations s)
+          (rotations (reverse s))
+          (rotations (self-interleave (reverse s)))
+          (rotations (self-interleave s))
+          (rotations (reverse (self-interleave s)))))
+
+(defn gen-partitions [strat s]
+  (cons (partition (count s) s) (cons (partition 1 s)
+        (as-> s $
+              (strat $)
+              (mapcat (fn [l] (for [x (range 2 (count l))] (partition-all x l))) $)))))
+
+(def gen-partitions-med
+  (partial gen-partitions rotate-self-interleave-strategy))
 
 (defn find-anagram [data s]
   (->> (clojure.string/replace s " " "")
-       (gen-partitions)
-       (pmap (fn [l] (map (partial ana-hash data) l)))
-       (pmap (fn [l] (apply cart l)))
+       (gen-partitions-med)
+       (pmap (partial map (partial ana-hash data)))
+       (pmap (partial apply cart))
        (filter (complement empty?))
        (mapcat identity)
-       (pmap reverse)
-       (pmap (partial clojure.string/join " "))
+       (pmap (comp (partial clojure.string/join " ")
+                   reverse))
        (distinct)))
 
 (def ana-data
-  (as-> "https://raw.githubusercontent.com/ehamiter/anagram/master/wordlist.txt" $
+  (as-> (str "https://raw.githubusercontent.com/"
+             "ehamiter/anagram/master/wordlist.txt") $
     (slurp $)
     (clojure.string/split $ #"\r?\n")
     (conj $ "i")
     (pmap #(cons (hash (frequencies %)) [%]) $)
     (reduce
       #(assoc %1
-         (first %2)
-         (conj (get %1 (first %2)) (second %2))) {} $)))
+        (first %2) (conj (get %1 (first %2)) (second %2)))
+      {}
+      $)))
 
 (def find-anagram
   (partial find-anagram ana-data))
@@ -62,16 +84,21 @@
 
 #+RESULTS:
 | #'badanagrams.core/rotate                                              |
-| #'badanagrams.core/rotatations                                         |
+| #'badanagrams.core/rotations                                           |
 | #'badanagrams.core/cart                                                |
 | #'badanagrams.core/ana-hash                                            |
+| #'badanagrams.core/interleave-all                                      |
+| #'badanagrams.core/self-interleave                                     |
+| #'badanagrams.core/rotate-self-interleave-strategy                     |
 | #'badanagrams.core/gen-partitions                                      |
+| #'badanagrams.core/gen-partitions-med                                  |
 | #'badanagrams.core/find-anagram                                        |
 | #'badanagrams.core/ana-data                                            |
 | #'badanagrams.core/find-anagram                                        |
-| ("el pes" "speel" "sleep" "peles" "peels" "pe sel" "pe els")           |
-| ("mead yards" "made yards" "dame yards" "mead drays" "made drays" "... |
-| ("gin rets" "gin rest" "gin erst" "stinger" "resting" "set ring" "s... |
+| ("speel" "sleep" "peles" "peels" "el pes" "pe sel" "pe els")           |
+| ("daydreams" "mead yards" "made yards" "dame yards" "mead drays" "m... |
+| ("stinger" "resting" "gin rets" "gin rest" "gin erst" "set ring" "s... |
 | ("refind worthed" "redfin worthed" "friend worthed" "finder worthed... |
 | ("re spae hake sima will" "er spae hake sima will" "re peas hake si... |
-| ("pie witan" "pie twain" "aw tiepin" "aw pinite")                      |
+| ("pie witan" "pie twain" "aw tiepin" "aw pinite" "ne wapiti" "en wa... |
+
